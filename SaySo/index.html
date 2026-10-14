@@ -1,0 +1,414 @@
+
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SaySo — Communication Board</title>
+
+<style>
+:root {
+  --teal: #087f8c;
+  --ink: #172033;
+  --background: #f1f5f9;
+  --border: #cbd5e1;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 24px;
+  font-family: Arial, sans-serif;
+  background: var(--background);
+  color: var(--ink);
+}
+
+main {
+  max-width: 1000px;
+  margin: auto;
+}
+
+h1 { font-size: 38px; margin-bottom: 8px; }
+h2 { font-size: 25px; }
+
+p {
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+button, input, textarea {
+  font: inherit;
+  border-radius: 12px;
+}
+
+button {
+  padding: 15px 18px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 4px solid #f59e0b;
+  outline-offset: 3px;
+}
+
+button:disabled { opacity: .6; cursor: wait; }
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.add {
+  background: var(--teal);
+  color: white;
+}
+
+.secondary {
+  background: #e2e8f0;
+  color: var(--ink);
+}
+
+.panel {
+  background: white;
+  padding: 22px;
+  border-radius: 16px;
+  margin: 24px 0;
+  box-shadow: 0 3px 12px #00000008;
+}
+
+label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 10px;
+  font-size: 18px;
+}
+
+input, textarea {
+  display: block;
+  width: 100%;
+  padding: 16px;
+  border: 2px solid #94a3b8;
+  background: white;
+  color: var(--ink);
+  font-size: 19px;
+}
+
+textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+#addForm { display: none; }
+
+#words {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 14px;
+}
+
+.word-card { min-width: 0; }
+
+.word {
+  width: 100%;
+  min-height: 95px;
+  background: white;
+  color: var(--ink);
+  border: 2px solid var(--border);
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+
+.word:hover {
+  background: #e0f2fe;
+  border-color: var(--teal);
+}
+
+.word-icon {
+  display: block;
+  font-size: 25px;
+  margin-bottom: 7px;
+}
+
+.remove {
+  display: block;
+  margin: 6px auto 0;
+  padding: 7px 10px;
+  font-size: 14px;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+#status {
+  min-height: 28px;
+  font-size: 16px;
+}
+
+@media (max-width: 500px) {
+  body { padding: 14px; }
+  .panel { padding: 16px; }
+  #words { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+</style>
+</head>
+
+<body>
+<main>
+  <h1>SaySo</h1>
+  <p>A communication board for everyone. Press a button to speak,
+     or type your own message.</p>
+
+  <section class="panel">
+    <h2>Type a message</h2>
+    <label for="message">What would you like to say?</label>
+    <textarea id="message"
+      placeholder="Type any word or sentence here..."></textarea>
+
+    <div class="toolbar">
+      <button class="add" id="speakMessage">🔊 Speak message</button>
+      <button class="secondary" id="clearMessage">Clear text</button>
+    </div>
+  </section>
+
+  <div class="toolbar">
+    <button class="add" id="showForm">+ Add Words</button>
+    <button class="secondary" id="stop">■ Stop speaking</button>
+  </div>
+
+  <section class="panel" id="addForm">
+    <label for="newWord">What should your new button say?</label>
+    <input id="newWord" maxlength="300"
+      placeholder="e.g. Can I have a snack, please?">
+    <div class="toolbar">
+      <button class="add" id="addWord">Create button</button>
+      <button class="secondary" id="cancel">Cancel</button>
+    </div>
+  </section>
+
+  <h2>My communication buttons</h2>
+  <div id="words"></div>
+
+  <p id="status" role="status" aria-live="polite">Ready.</p>
+</main>
+
+<script>
+const starterWords = [
+  // Your original phrases
+  "Ghost in a cup",
+  "Pack lunch",
+  "Please",
+  "Bye",
+  "Good morning",
+  "Good afternoon",
+  "Haircut",
+  "Library",
+  "Bus",
+  "A box",
+  "Outside",
+  "Duck",
+  "I want",
+  "I need",
+  "Thank you",
+  "Sorry",
+  "Water",
+  "Soon",
+  "Flip out",
+  "Hall",
+  "You're welcome",
+  "Papers",
+  "iPad",
+  "Breadsticks",
+  "Snack",
+  "I'm hungry",
+  "Orange",
+  "Coat",
+  "What am I eating?",
+  "Me, myself and I",
+  "Shaan",
+
+  // Colours
+  "Red",
+  "Green",
+  "Blue",
+  "Yellow",
+  "Orange",
+  "Purple",
+  "Pink",
+  "Black",
+  "White",
+  "Brown",
+  "Grey"
+];
+
+const storageKey = "sayso-communication-words-v2";
+
+let words = starterWords.slice();
+
+try {
+  const saved = localStorage.getItem(storageKey);
+  if (saved !== null) {
+    const parsed = JSON.parse(saved);
+    if (Array.isArray(parsed) &&
+        parsed.every(word => typeof word === "string")) {
+      words = parsed;
+    }
+  }
+} catch (error) {
+  // Use the default buttons if saved data cannot be read.
+}
+
+const list = document.getElementById("words");
+const form = document.getElementById("addForm");
+const input = document.getElementById("newWord");
+const message = document.getElementById("message");
+const status = document.getElementById("status");
+
+function saveWords() {
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(words));
+  } catch (error) {
+    status.textContent =
+      "Changes work, but this browser could not save them.";
+  }
+}
+
+function speak(text) {
+  if (!("speechSynthesis" in window)) {
+    status.textContent = "Speech is not supported by this browser.";
+    return;
+  }
+
+  speechSynthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "en-GB";
+
+  utterance.onstart = () => {
+    status.textContent = "Speaking: " + text;
+  };
+
+  utterance.onend = () => {
+    status.textContent = "Ready.";
+  };
+
+  utterance.onerror = event => {
+    if (event.error !== "canceled") {
+      status.textContent = "Speech could not be played.";
+    }
+  };
+
+  speechSynthesis.speak(utterance);
+}
+
+function render() {
+  list.replaceChildren();
+
+  words.forEach((word, index) => {
+    const card = document.createElement("div");
+    card.className = "word-card";
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "word";
+
+    const icon = document.createElement("span");
+    icon.className = "word-icon";
+    icon.textContent = "🔊";
+    icon.setAttribute("aria-hidden", "true");
+
+    const label = document.createElement("span");
+    label.textContent = word;
+
+    button.append(icon, label);
+    button.setAttribute("aria-label", "Speak: " + word);
+    button.addEventListener("click", () => speak(word));
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "remove";
+    remove.textContent = "Remove";
+    remove.setAttribute("aria-label", "Remove " + word);
+
+    remove.addEventListener("click", () => {
+      words.splice(index, 1);
+      saveWords();
+      render();
+      status.textContent = "Button removed.";
+    });
+
+    card.append(button, remove);
+    list.append(card);
+  });
+}
+
+document.getElementById("speakMessage").addEventListener("click", () => {
+  const text = message.value.trim();
+
+  if (!text) {
+    status.textContent = "Type a message first.";
+    message.focus();
+    return;
+  }
+
+  speak(text);
+});
+
+document.getElementById("clearMessage").addEventListener("click", () => {
+  message.value = "";
+  status.textContent = "Text cleared.";
+  message.focus();
+});
+
+document.getElementById("showForm").addEventListener("click", () => {
+  form.style.display = "block";
+  input.focus();
+});
+
+function addWord() {
+  const word = input.value.trim();
+
+  if (!word) {
+    status.textContent = "Type a word or sentence first.";
+    input.focus();
+    return;
+  }
+
+  words.push(word);
+  saveWords();
+  render();
+
+  input.value = "";
+  form.style.display = "none";
+  status.textContent = "New speaking button added.";
+}
+
+document.getElementById("addWord").addEventListener("click", addWord);
+
+input.addEventListener("keydown", event => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    addWord();
+  }
+});
+
+document.getElementById("cancel").addEventListener("click", () => {
+  form.style.display = "none";
+  input.value = "";
+});
+
+document.getElementById("stop").addEventListener("click", () => {
+  speechSynthesis.cancel();
+  status.textContent = "Speech stopped.";
+});
+
+render();
+</script>
+</body>
+</html>
